@@ -1,10 +1,11 @@
+import sys
 import hashlib
 import requests
 
-import sys
+from blockchain import blockchain, node_identifier
 
 
-# TODO: Implement functionality to search for a proof 
+# TODO: Implement functionality to search for a proof
 
 
 if __name__ == '__main__':
@@ -18,8 +19,27 @@ if __name__ == '__main__':
     # Run forever until interrupted
     while True:
         # TODO: Get the last proof from the server and look for a new one
+        URL = "http://localhost:5000/last_proof"
+        r = requests.get(URL)
+        last_proof = r.json()["last_proof"]
+
+        new_proof = blockchain.proof_of_work(last_proof)
+
+        print(last_proof)
+        print(new_proof)
+
         # TODO: When found, POST it to the server {"proof": new_proof}
+
+        proof_json = {
+            "proof": new_proof,
+            "client_node_identifier": node_identifier
+        }
+
+        payload = proof_json
+        MINE_URL = 'http://localhost:5000/mine'
+        mine_r = requests.post(MINE_URL, payload)
+        print(mine_r.json())
+
         # TODO: If the server responds with 'New Block Forged'
         # add 1 to the number of coins mined and print it.  Otherwise,
         # print the message from the server.
-        pass

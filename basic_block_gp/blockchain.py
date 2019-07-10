@@ -74,23 +74,6 @@ class Blockchain(object):
     def last_block(self):
         return self.chain[-1]
 
-    # def proof_of_work(self, last_proof):
-    #     """
-    #     Simple Proof of Work Algorithm
-    #     - Find a number p' such that hash(pp') contains 4 leading
-    #     zeroes, where p is the previous p'
-    #     - p is the previous proof, and p' is the new proof
-    #     """
-    #     # start our proof at zero
-    #     proof = 0
-
-    #     # increment proof by 1 until valid proof returns true
-    #     while self.valid_proof(last_proof, proof) is False:
-    #         proof += 1
-
-    #     # once a valid proof is reached return it
-    #     return proof
-
     @staticmethod
     def valid_proof(last_proof, proof):
         """
@@ -155,18 +138,29 @@ def last_proof():
     return jsonify(response), 200
 
 
-@app.route('/mine', methods=['GET'])
+@app.route('/mine', methods=['POST'])
 def mine():
-    # We run the proof of work algorithm to get the next proof...
+
+    values = request.get_json()
+
+    # Check that the required fields are in the POST'ed data
+    # required = ['proof', 'client_node_identifier']
+    # if not all(k in values for k in required):
+    #     return 'Missing Values', 400
+
     last_block = blockchain.last_block
-    last_proof = last_block['proof']
-    proof = blockchain.proof_of_work(last_proof)
+    proof = values['proof']
+    client_node_identifier = values['client_node_identifier']
+
+    if not blockchain.valid_proof(last_block[proof], proof):
+        return 'invalid proof / block already mined', 400
 
     # We must receive a reward for finding the proof.
     # The sender is "0" to signify that this node has mine a new coin
     # The recipient is the current node, it did the mining!
     # The amount is 1 coin as a reward for mining the next block
-    blockchain.new_transaction(sender="0", recipient=node_identifier, amount=1)
+    blockchain.new_transaction(
+        sender="0", recipient=client_node_identifier, amount=1)
     # Forge the new Block by adding it to the chain
     previous_hash = blockchain.hash(last_block)
     block = blockchain.new_block(proof, previous_hash)
