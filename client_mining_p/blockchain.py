@@ -5,8 +5,6 @@ from uuid import uuid4
 
 from flask import Flask, jsonify, request
 
-import sys
-
 
 class Blockchain(object):
     def __init__(self):
@@ -76,19 +74,22 @@ class Blockchain(object):
     def last_block(self):
         return self.chain[-1]
 
-    def proof_of_work(self, last_proof):
-        """
-        Simple Proof of Work Algorithm
-        - Find a number p' such that hash(pp') contains 4 leading
-        zeroes, where p is the previous p'
-        - p is the previous proof, and p' is the new proof
-        """
+    # def proof_of_work(self, last_proof):
+    #     """
+    #     Simple Proof of Work Algorithm
+    #     - Find a number p' such that hash(pp') contains 4 leading
+    #     zeroes, where p is the previous p'
+    #     - p is the previous proof, and p' is the new proof
+    #     """
+    #     # start our proof at zero
+    #     proof = 0
 
-        proof = 0
-        while self.valid_proof(last_proof, proof) is False:
-            proof += 1
+    #     # increment proof by 1 until valid proof returns true
+    #     while self.valid_proof(last_proof, proof) is False:
+    #         proof += 1
 
-        return proof
+    #     # once a valid proof is reached return it
+    #     return proof
 
     @staticmethod
     def valid_proof(last_proof, proof):
@@ -96,9 +97,13 @@ class Blockchain(object):
         Validates the Proof:  Does hash(last_proof, proof) contain 4
         leading zeroes?
         """
-        guess = f'{last_proof}{proof}'.encode()
+        # encode a guess
+        guess = f"{last_proof}{proof}".encode()
+        # hashing the guess
         guess_hash = hashlib.sha256(guess).hexdigest()
-        return guess_hash[:4] == "0000"
+
+        # return True if the first 6 digits of the hash ar zreos
+        return guess_hash[:6] == "000000"
 
     def valid_chain(self, chain):
         """
@@ -117,10 +122,12 @@ class Blockchain(object):
             print(f'{block}')
             print("\n-------------------\n")
             # Check that the hash of the block is correct
+            # Return false if hash isn't correct
             if block['previous_hash'] != self.hash(last_block):
                 return False
 
             # Check that the Proof of Work is correct
+            # Return false if proof isn't correct
             if not self.valid_proof(last_block['proof'], block['proof']):
                 return False
 
@@ -140,25 +147,42 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = Blockchain()
 
 
-@app.route('/mine', methods=['GET'])
+@app.route('/last_proof', methods=['GET'])
+def last_proof():
+    response = {
+        'last_proof': blockchain.chain[-1]['proof']
+    }
+    return jsonify(response), 200
+
+
+@app.route('/mine', methods=['POST'])
 def mine():
-    # We run the proof of work algorithm to get the next proof...
+
+    values = request.get_json()
+
+    # Check that the required fields are in the POST'ed data
+    required = ['proof', 'client_node_identifier']
+    if not all(k in values for k in required):
+        return 'Missing Values', 400
+
     last_block = blockchain.last_block
-    last_proof = last_block['proof']
-    proof = blockchain.proof_of_work(last_proof)
+    proof = values['proof']
+    client_node_identifier = values['client_node_identifier']
+
+    if not blockchain.valid_proof(last_block[proof], proof):
+        return 'invalid proof / block already mined', 400
 
     # We must receive a reward for finding the proof.
     # The sender is "0" to signify that this node has mine a new coin
+    # The recipient is the current node, it did the mining!
+    # The amount is 1 coin as a reward for mining the next block
     blockchain.new_transaction(
-        sender="0",
-        recipient=node_identifier,
-        amount=1,
-    )
-
-    # Forge the new BLock by adding it to the chain
+        sender="0", recipient=client_node_identifier, amount=1)
+    # Forge the new Block by adding it to the chain
     previous_hash = blockchain.hash(last_block)
     block = blockchain.new_block(proof, previous_hash)
 
+    # Send a response with the new block
     response = {
         'message': "New Block Forged",
         'index': block['index'],
@@ -191,18 +215,11 @@ def new_transaction():
 def full_chain():
     response = {
         'chain': blockchain.chain,
-        'length': len(blockchain.chain),
+        'length': len(blockchain.chain)
     }
     return jsonify(response), 200
 
 
-# Note, when demoing, start with this, then change to the below
-# if __name__ == '__main__':
-#     app.run(host='0.0.0.0', port=5000)
-
+# Run the program on port 5000
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        port = int(sys.argv[1])
-    else:
-        port = 5000
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=5000)

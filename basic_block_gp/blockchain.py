@@ -102,8 +102,8 @@ class Blockchain(object):
         # hashing the guess
         guess_hash = hashlib.sha256(guess).hexdigest()
 
-        # return True if the last 4 digits of the hash ar zreos
-        return guess_hash[-4:] == "000000"
+        # return True if the first 6 digits of the hash ar zreos
+        return guess_hash[:6] == "000000"
 
     def valid_chain(self, chain):
         """
@@ -145,6 +145,14 @@ node_identifier = str(uuid4()).replace('-', '')
 
 # Instantiate the Blockchain
 blockchain = Blockchain()
+
+
+@app.route('/last_proof', methods=['GET'])
+def last_proof():
+    response = {
+        'last_proof': blockchain.chain[-1]['proof']
+    }
+    return jsonify(response), 200
 
 
 @app.route('/mine', methods=['GET'])
