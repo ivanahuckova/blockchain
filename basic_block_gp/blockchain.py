@@ -17,7 +17,6 @@ class Blockchain(object):
     def new_block(self, proof, previous_hash=None):
         """
         Create a new Block in the Blockchain
-
         :param proof: <int> The proof given by the Proof of Work algorithm
         :param previous_hash: (Optional) <str> Hash of previous Block
         :return: <dict> New Block
@@ -40,11 +39,10 @@ class Blockchain(object):
     def new_transaction(self, sender, recipient, amount):
         """
         Creates a new transaction to go into the next mined Block
-
         :param sender: <str> Address of the Recipient
         :param recipient: <str> Address of the Recipient
         :param amount: <int> Amount
-        :return: <int> The index of the BLock that will hold this transaction
+        :return: <int> The index of the Block that will hold this transaction
         """
 
         self.current_transactions.append({
@@ -59,7 +57,6 @@ class Blockchain(object):
     def hash(block):
         """
         Creates a SHA-256 hash of a Block
-
         :param block": <dict> Block
         "return": <str>
         """
@@ -74,6 +71,23 @@ class Blockchain(object):
     def last_block(self):
         return self.chain[-1]
 
+    def proof_of_work(self, last_proof):
+        """
+        Simple Proof of Work Algorithm
+        - Find a number p' such that hash(pp') contains 4 leading
+        zeroes, where p is the previous p'
+        - p is the previous proof, and p' is the new proof
+        """
+        # start our proof at zero
+        proof = 0
+
+        # increment proof by 1 until valid proof returns true
+        while self.valid_proof(last_proof, proof) is False:
+            proof += 1
+
+        # once a valid proof is reached return it
+        return proof
+
     @staticmethod
     def valid_proof(last_proof, proof):
         """
@@ -85,13 +99,12 @@ class Blockchain(object):
         # hashing the guess
         guess_hash = hashlib.sha256(guess).hexdigest()
 
-        # return True if the first 6 digits of the hash ar zreos
-        return guess_hash[:6] == "000000"
+        # return True if the last 4 digits of the hash ar zreos
+        return guess_hash[-4:] == "0000"
 
     def valid_chain(self, chain):
         """
         Determine if a given blockchain is valid
-
         :param chain: <list> A blockchain
         :return: <bool> True if valid, False if not
         """
@@ -130,37 +143,18 @@ node_identifier = str(uuid4()).replace('-', '')
 blockchain = Blockchain()
 
 
-@app.route('/last_proof', methods=['GET'])
-def last_proof():
-    response = {
-        'last_proof': blockchain.chain[-1]['proof']
-    }
-    return jsonify(response), 200
-
-
-@app.route('/mine', methods=['POST'])
+@app.route('/mine', methods=['GET'])
 def mine():
-
-    values = request.get_json()
-
-    # Check that the required fields are in the POST'ed data
-    # required = ['proof', 'client_node_identifier']
-    # if not all(k in values for k in required):
-    #     return 'Missing Values', 400
-
+    # We run the proof of work algorithm to get the next proof...
     last_block = blockchain.last_block
-    proof = values['proof']
-    client_node_identifier = values['client_node_identifier']
-
-    if not blockchain.valid_proof(last_block[proof], proof):
-        return 'invalid proof / block already mined', 400
+    last_proof = last_block['proof']
+    proof = blockchain.proof_of_work(last_proof)
 
     # We must receive a reward for finding the proof.
     # The sender is "0" to signify that this node has mine a new coin
     # The recipient is the current node, it did the mining!
     # The amount is 1 coin as a reward for mining the next block
-    blockchain.new_transaction(
-        sender="0", recipient=client_node_identifier, amount=1)
+    blockchain.new_transaction(sender="0", recipient=node_identifier, amount=1)
     # Forge the new Block by adding it to the chain
     previous_hash = blockchain.hash(last_block)
     block = blockchain.new_block(proof, previous_hash)
@@ -205,4 +199,4 @@ def full_chain():
 
 # Run the program on port 5000
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='127.0.0.1', port=5000)
