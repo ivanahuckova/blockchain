@@ -248,14 +248,19 @@ def mine():
     last_proof = last_block['proof']
 
     values = request.get_json()
+    required = ['proof', 'id']
+    if not all(k in values for k in required):
+        return 'Missing Values', 400
+
     submitted_proof = values.get('proof')
+    miner_id = values.get('id')
 
     if blockchain.valid_proof(last_proof, submitted_proof):
         # We must receive a reward for finding the proof.
         # The sender is "0" to signify that this node has mine a new coin
         blockchain.new_transaction(
-            sender="0",
-            recipient=node_identifier,
+            sender=node_identifier,
+            recipient=miner_id,
             amount=1,
         )
 
