@@ -17,23 +17,30 @@ class Blockchain(object):
         self.nodes = set()
         self.genesis_block()
 
+        # Don't create a block automatically.  If we do,
+        # every node will have a different anchor
+        # self.new_block(previous_hash=1, proof=99)  # 99 is faster for 1st
+
     def genesis_block(self):
         """
         Create the genesis block and add it to the chain
+
         The genesis block is the anchor of the chain.  It must be the
         same for all nodes, or their chains will fail consensus.
+
         It is normally hard-coded
         """
         block = {
             'index': 1,
-            'timestamp': time(),
-            'transactions': None,
-            'proof': self.hash("This is the beginning of the new financial situation"),
-            'previous_hash': None,
+            'timestamp': 0,
+            'transactions': [],
+            'proof': 99,  # 99 is faster for 1st proof gen
+            'previous_hash': 1,
         }
+
         self.chain.append(block)
 
-    def new_block(self, proof, previous_hash=None):
+    def new_block(self, proof, previous_hash):
         """
         Create a new Block in the Blockchain
 
@@ -47,8 +54,7 @@ class Blockchain(object):
             'timestamp': time(),
             'transactions': self.current_transactions,
             'proof': proof,
-            # TODO remove hash chain
-            'previous_hash': previous_hash or self.hash(self.chain[-1]),
+            'previous_hash': previous_hash,
         }
 
         # Reset the current list of transactions
@@ -57,16 +63,19 @@ class Blockchain(object):
         self.chain.append(block)
         return block
 
-    # task
     def add_block(self, block):
         """
         Add a received Block to the end of the Blockchain
+
         :param block: <Block> The validated Block sent by another node in the
         network
         """
 
-        # Reset the current list of transactions.
-        pass
+        # Reset the current list of transactions.  TODO: Handle pending
+        # transactions
+        self.current_transactions = []
+
+        self.chain.append(block)
 
     def new_transaction(self, sender, recipient, amount):
         """
@@ -202,16 +211,24 @@ class Blockchain(object):
 
         return False
 
-    # task
     def broadcast_new_block(self, block):
         """
         Alert neigbors in list of nodes that a new block has been mined
         :param block: <Block> the block that has been mined and added to the 
         chain
         """
+        neighbours = self.nodes
 
-        # loop over all nodes
-        pass
+        post_data = {"block": block}
+
+        # Grab and verify the chains from all the nodes in our network
+        for node in neighbours:
+            response = requests.post(f'http://{node}/block/new',
+                                     json=post_data)
+
+            if response.status_code != 200:
+                # Error handling
+                pass
 
 
 # Instantiate our Node
@@ -223,7 +240,7 @@ node_identifier = str(uuid4()).replace('-', '')
 # Instantiate the Blockchain
 blockchain = Blockchain()
 
-# * When a new block is mined, alert all nodes in its list of registered nodes to add the new block
+
 @app.route('/mine', methods=['POST'])
 def mine():
     # Determine if proof is valid
@@ -242,11 +259,12 @@ def mine():
             amount=1,
         )
 
-        # Forge the new BLock by adding it to the chain
+        # Forge the new Block by adding it to the chain
         previous_hash = blockchain.hash(last_block)
+        # print('Hash is: ' + str(previous_hash), file=sys.stderr)
         block = blockchain.new_block(submitted_proof, previous_hash)
 
-        # TODO TASK Broadcast new block
+        # Broadcast the new block
         blockchain.broadcast_new_block(block)
 
         response = {
@@ -263,19 +281,41 @@ def mine():
         }
         return jsonify(response), 200
 
-# TASK
+
 # Receive a new block from a peer
-
-
 @app.route('/block/new', methods=['POST'])
 def new_block():
-        # Check that the required fields are in the POST'ed data
+    values = request.get_json()
 
-            # TODO: Verify that the sender is one of our peers
+    # Check that the required fields are in the POST'ed data
+    required = ['block']
+    if not all(k in values for k in required):
+        return 'Missing Values', 400
 
-        # Check that the new block index is 1 higher than our last block
+    # TODO: Verify that the sender is one of our peers
 
-    pass
+    # Check that the new block index is 1 higher than our last block
+    new_block = values.get('block')
+    old_block = blockchain.last_block
+    print('new block received', file=sys.stderr)
+    print('with index' + str(new_block.get('index: ')), file=sys.stderr)
+    if new_block.get('index') == old_block.get('index') + 1:
+        # Verify the block by making sure the previous hash matches
+        print('and has the correct index', file=sys.stderr)
+        if (new_block.get('previous_hash') ==
+                blockchain.hash(blockchain.last_block)):
+            print('new block accepted', file=sys.stderr)
+            blockchain.add_block(new_block)
+            return 'Block Accepted', 200
+        else:
+            return 'Invalid Block, hash does not match', 400
+    # Otherwise, check for consensus
+    else:
+        # TODO: This locks both servers while they await a response
+        # from the other server
+        print('seeking consensus', file=sys.stderr)
+        consensus()
+        return 'Seeking consensus from network', 200
 
 
 @app.route('/transactions/new', methods=['POST'])
