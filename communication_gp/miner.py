@@ -1,5 +1,6 @@
 import hashlib
 import requests
+from uuid import uuid4
 
 import sys
 

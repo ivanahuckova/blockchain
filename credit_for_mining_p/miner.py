@@ -1,5 +1,6 @@
 import hashlib
 import requests
+from uuid import uuid4
 
 import sys
 
@@ -31,6 +32,22 @@ def valid_proof(last_proof, proof):
     return guess_hash[:6] == "000000"
 
 
+def get_miner_id():
+    try:
+        with open('./credit_for_mining_p/my_id') as i:
+            read_data = i.read()
+    except FileNotFoundError:
+        f = open('./credit_for_mining_p/my_id', "w+")
+
+        id = str(uuid4()).replace('-', '')
+        f.write(id)
+        f.close()
+
+        read_data = id
+
+    return read_data
+
+
 if __name__ == '__main__':
     # What node are we interacting with?
     if len(sys.argv) > 1:
@@ -46,12 +63,13 @@ if __name__ == '__main__':
         data = r.json()
         new_proof = proof_of_work(data.get('proof'))
 
-        post_data = {"proof": new_proof}
+        post_data = {"proof": new_proof, 'id': get_miner_id()}
 
         r = requests.post(url=node + "/mine", json=post_data)
         data = r.json()
         if data.get('message') == 'New Block Forged':
             coins_mined += 1
             print("Total coins mined: " + str(coins_mined))
+            print(f"Block number: {data.get('index')}\n")
         else:
             print(data.get('message'))
